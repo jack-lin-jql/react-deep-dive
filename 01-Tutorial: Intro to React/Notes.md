@@ -57,6 +57,7 @@ return React.createElement('div', { className: 'shopping-list' },
 - There are generally two approaches to changing data. First being to mutate the data by directly changing the data's values. Second being to replace the data with a new copy which has the desired changes
 
 ### Data change with mutation
+
 ```
 var player = { score: 1, name: 'Jeff' };
 player.score = 2;
@@ -65,6 +66,7 @@ player.score = 2;
 ```
 
 ### Data change without mutation
+
 ```
 var player = { score: 1, name: 'Jeff' };
 var newPlayer = Object.assign({}, player, { score: 2 });
@@ -73,3 +75,24 @@ var newPlayer = Object.assign({}, player, { score: 2 });
 // Or if you are using object spread syntax, one can write
 var newPlayer = { ...player, score: 2 };
 ```
+
+- By not mutating directly, several benefits are gained
+
+### Complex feature become simple
+
+- Immutability makes complex feature easier to implement
+- For example, the ability to undo and redo certain actions is a common requirement in applications and by avoiding direct data mutation, it allows us to keep previous states of the application to be reused later
+
+### Detecting changes
+
+- Change detection is in mutable objects is difficult since they're modified directly. The detection would require the mutable object to be compared to previous copies of itself and the entire object tree to be traversed
+- As for immutable objects, if a different immutable object is being referenced than the previous one, then the object has changed
+
+### Determining when to re-render in React
+
+- Immutability also helps with building pure components since immutable data can easily determine if changes have been made, which helps to determine if a component requires re-rendering
+
+## Function components
+
+- Function components are a simpler way to write components that only contain a render method and don't have their own state
+- Instead of a class that extends React.Component, one can write a function that takes props as input and returns what should be rendered
