@@ -96,3 +96,33 @@ var newPlayer = { ...player, score: 2 };
 
 - Function components are a simpler way to write components that only contain a render method and don't have their own state
 - Instead of a class that extends React.Component, one can write a function that takes props as input and returns what should be rendered
+
+## Picking a key
+
+- When rendering a list, React stores some information about each rendered list item. When this list updates, React needs to determine what has changed
+- For example:
+```
+// From
+<li>Alexa: 7 tasks left</li>
+<li>Ben: 5 tasks left</li>
+
+// To
+<li>Ben: 9 tasks left</li>
+<li>Claudia: 8 tasks left</li>
+<li>Alexa: 5 tasks left</li>
+```
+- Here, in addition to updated counts, Alexa and Ben were swapped. We need to specify a key for each list item to differentiate each from its siblings
+```
+<li key={user.id}>{user.name}: {user.taskCount} tasks left</li>
+```
+- Now, when a list is re-rendered, React takes each list item's key and searches the previous list's items for a matching key
+  - If the current list has a new key, React creates a component
+  - If the current list is missing a key that existed previously, React destroys the previous component
+  - If two keys match, the corresponding component is moved
+- Keys tell React about the identity of each component's key changes, the component will be destroyed and recreated with a new state
+- `key` is a special reserved property in React. When an element is created, React extracts the `key` property and stores the key directly on the returned element
+- `key` cannot be referenced using `this.props.key` even though it may look like it belongs in `props`
+- It's strongly recommended that one assign proper keys when building dynamic lists
+- If no key is specified, React throws a warning and uses array index as a key by default. This is problematic when reordering or inserting/removing list items
+- Explicitly passing `key={index_value}` silences the warning, but the same reordering problems exist
+- Keys do not need to be globally unique, but they need to be unique between components and their siblings
