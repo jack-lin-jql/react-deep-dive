@@ -76,4 +76,24 @@ FilterableProductTable
 ## Step 4: identify where your state should live
 
 - Now, we need to identify which components mutate or owns different states
-- 
+- React is all about one-way data flow down the component hierarchy
+- We can follow the following procedure to determine where states should live
+  - Identify every component that renders something based on that state
+  - Find a common owner component (single component above all the components that need the state in the hierarchy)
+  - Either the common owner or another component higher up in the hierarchy should own the state
+  - If a component can't be found to own the state, create a new component solely for holding the state and add it somewhere in the hierarchy above the common owner component
+
+- `ProductTable` needs to filter the product list based on state and `SearchBar` needs to display the search text and checked state
+- Common owner component is `FilterableProductTable`, so it conceptually makes sense for the filter text and checked value to live in `FilterableProductTable`
+
+## Step 5: add inverse data flow
+
+- The form component deep in the hierarchy need to update the state in FilterableProductTable
+- React makes this data flow explicitly to help understand how one program works, but it requires a bit more typing than the traditional two-way data binding
+- If one tries to type of check the box in the current version of the example, React will ignore the inputs. This is because the `value` prop of the `input` is set to always be the `state` passed in from `FilterableProductTable`
+- We want to make sure that whenever the user changes the form, the state is updated to reflect the user input. Since **components should only update their own state**, `FilterableProductTable` will pass callbacks to `SearchBar` that'll fire whenever the state should be updated
+- One can use the `onChange` event on the inputs to be notified of it
+- The callback passed by `FilterableProductTable` will call `setState()` and the app will be updated
+- NOTE: Personally, I've been passing down state setters since hook setters are easily passable. When in a class component, remember to create an explicitly handler function to make state changes. I think hook setters should follow the same pattern
+
+- See source code here: https://codepen.io/gaearon/pen/LzWZvb
