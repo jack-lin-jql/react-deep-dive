@@ -333,3 +333,86 @@ class BlurExample extends React.Component {
 ### Setting the language
 
 - Indicate the human language of page text as screen reader software uses this to select the correct voice settings
+
+### Setting the document title
+
+- Set the document `<title>` to correctly describe the current page content as this ensures the user remains aware of the current page context. See requirements [here](https://www.w3.org/TR/UNDERSTANDING-WCAG20/navigation-mechanisms-title.html)
+- Dan Abramov provides a convenient component [react-document-title](https://github.com/gaearon/react-document-title) to easily set the page document title, but I think leveraging `document.title` directly is probably easiest
+
+### Color contrast
+
+- Ensure all readable text on a website has sufficient color contrast to remain maximally readable by users with low vision
+- One can use a tool to calculate proper color combinations for all cases such as [Colorable](https://jxnblk.github.io/colorable/)
+- One can also contrast test their website using contrast analyzer/testing tools
+
+## Development and testing tools
+
+- There''re a number of tools that can be used to assist in the creation of accessible web apps
+
+### The keyboard
+
+- This is one of the most important checks to ensure if the entire website can be reached and used with the keyboard alone
+- One can follow the following
+  1. Disconnect mouse
+  2. Use `Tab` and `Shift+Tab` to browse
+  3. Use `Enter` to activate elements
+  4. Where required, use keyboard arrow keys to interact with some elements such as menus and dropdowns
+
+### Development assistance
+
+- Some accessibility features can be checked directly in JSX. Intellisense checks are already provided in JSX aware IDE's for the ARIA roles, state and properties.
+
+#### eslint-plugin-jsx-a11y
+
+- Plugin for ESLint to provide AST linting feedback regarding accessibility issues in JSX
+- Many IDEs allow one to integrate these findings directly into code analysis and source code windows
+- CRA has this plugin with a subset of rules activated. If one wants to enable even more accessibility rules, one can create an `.eslintrc` file in the root of the project with the following 
+
+```
+{
+  "extends": ["react-app", "plugin:jsx-a11y/recommended"],
+  "plugins": ["jsx-a11y"]
+}
+```
+
+### Testing accessibility in the browser
+
+- There're a number of tools our there that audits web pages. The following are tools that test technical accessibility of the HTML
+
+#### aXe, aXe-core and react-axe
+
+- Deque Systems offers aXe-core for automated e2e accessibility tests of applications. This includes the integration for Selenium
+- The Accessibility Engine or aXe, is an accessibility inspector browser extension built on aXe-core
+- One can also use the `react-axe` module to report these accessibility findings directly to the console while developing and debugging
+
+#### WebAIM WAVE
+
+- Another accessibility browser extension known as Web Accessibility Evaluation Tool
+
+#### Accessibility inspector and Accessibility Tree
+
+- Accessibility Tree is a subset of the DOM tree that contains accessible objects for every DOM element that should be exposed to assistive technology
+- Inspect the accessibility information in the console like [this](https://developers.google.com/web/tools/chrome-devtools/accessibility/reference#pane)
+
+### Screen readers 
+
+- Testing with a screen reader should form part of one's accessibility tests
+- Browser and screen reader combination matters so it's recommended that one tests their application in the browser best suited to screen reader of choice
+
+### Commonly used screen readers
+
+#### NVDA in Firefox
+
+- NonVisual Desktop Access (NVDA) is open source Windows screen reader that's widely used
+
+#### VoiceOver in Safari
+
+- An integrated screen reader on Apple devices
+
+#### JAWS in IE
+
+- Job Access With Speech (JAWS) is a prolifically used screen reader on Windows
+
+#### ChromeVox in Google Chrome
+
+- An integrated screen reader on Chromebooks and is available as a Chrome extension
