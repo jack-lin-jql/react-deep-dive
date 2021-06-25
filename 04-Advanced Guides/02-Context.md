@@ -159,4 +159,309 @@ function Page(props) {
 
 ### Context.Provider
 
-- 
+`<MyContext.Provider value={/* some value */} />`
+
+- Every Context object comes with a Provider React component that **allows consuming components to subscribe to context changes**
+- The Provider component accepts a `value` prop to be passed to consuming components that are descendants of this Provider
+- One Provider can be connected to many consumers (one to many)
+- Provider can be nested to override values deeper within the tree
+- All consumers that are descendant of a Provider will re-render whenever the Provider's `value` prop changes
+- The propagation from Provider to its descendant consumer (including `.contextType` and `useContext`) is **not subject to** the `shouldComponentUpdate` method, so the consumer is updated even when an ancestor component skips an update
+- Changes are determined by comparing the new and old values using the same algo as `Object.is`
+- Note: The way changes are determined can cause some issues when passing object as `value`
+
+### Class.contextType
+
+```
+class MyClass extends React.Component {
+  componentDidMount() {
+    let value = this.context;
+    /* perform a side-effect at mount using the value of MyContext */
+  }
+  componentDidUpdate() {
+    let value = this.context;
+    /* ... */
+  }
+  componentWillUnmount() {
+    let value = this.context;
+    /* ... */
+  }
+  render() {
+    let value = this.context;
+    /* render something based on the value of MyContext */
+  }
+}
+MyClass.contextType = MyContext;
+```
+
+- The `contextType` property on a class can be assigned a Context object created by `React.createContext()`
+- Using this property lets one consume the nearest current value of that COntext type using `this.context`
+- One can reference this in any of the lifecycle methods including the render function
+- Note: one can only subscribe to a single context using this API. If one needs to more, I'm guessing `useContext` might be needed
+- Note: If one is using the experimental public class field syntax then they can use a static class field to initialize the `contextType`
+
+```
+class MyClass extends React.Component {
+  static contextType = MyContext;
+
+  render() {
+    let value = this.context;
+    /* render something based on the value */
+  }
+}
+```
+
+### Context.Consumer
+
+```
+<MyContext.Consumer>
+  {value => /* render something based on the context value */}
+</MyContext.Consumer>
+```
+
+- A React component that subscribes to context changes
+- Using this component lets one subscribe to a context within a `function component`
+- This requires a function as a child (render props concept). The function receives the current context value and returns a React node
+- The `value` argument passed to the function will be equal to the `value` prop of the closes Provider for this context above in the tree
+- If there's no Provider for this context value, the `value` argument will be equal to the `defaultValue` that was passed to `createContext()`
+
+### Context.displayName
+
+- Context object accepts a `displayName` string property
+- React DevTools uses this string to determine what to display for the context
+
+```
+const MyContext = React.createContext(/* some value */);
+MyContext.displayName = 'MyDisplayName';
+
+<MyContext.Provider> // "MyDisplayName.Provider" in DevTools
+<MyContext.Consumer> // "MyDisplayName.Consumer" in DevTools
+```
+
+## Examples
+
+### Dynamic Context
+
+```
+// theme-context.js
+
+export const themes = {
+  light: {
+    foreground: '...',
+    background: '...',
+  },
+  dark: {
+    foreground: '...',
+    background: '...',
+  },
+};
+
+export const ThemeContext = React.createContext(
+  theme.dark // default value
+);
+```
+
+```
+// themed-button.js
+import { ThemeContext } from "./theme-context";
+
+class ThemedButton extends React.Component {
+  render() {
+    let props = this.props;
+    let theme = this.context;
+    return (
+      <button {...props} style={{ backgroundColor: theme.background }} />
+    );
+  }
+}
+
+ThemedButton.contextType = ThemeContext;
+
+export default ThemedButton;
+```
+
+```
+// app.js
+import {ThemeContext, themes} from "./theme-context";
+import ThemedButton from "./themed-button";
+
+// An intermediate component that uses the ThemedButton
+function Toolbar(props) {
+  return (
+    <ThemedButton onClick={props.changeTheme}>
+      Change Theme
+    </ThemButton>
+  );
+}
+
+class App extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      theme: themes.light,
+    };
+
+    this.toggleTheme = () => {
+      this.setState(state => ({
+        theme:
+          state.theme === theme.dark
+            ? themes.light : themes.dark,
+      }));
+    };
+  }
+
+  render() {
+    // The ThemedButton button inside the ThemeProvider uses the them from state while one outside uses the default dark theme
+    return (
+      <Page>
+        <ThemeContext.Provider value={this.state.theme}>
+          <Toolbar changeTheme={this.toggleTheme} />
+        </ThemeContext.Provider>
+        <Section>
+          <ThemedButton />
+        </Section>
+      </Page>
+    );
+  }
+}
+
+ReactDOM.render(<App />, document.root);
+```
+
+### Updating context from a nested component
+
+- It's often necessary to update the context from a component that is nested somewhere deeply in the component tree
+- In this case, one can pass a function down through the context to allow consumers to update the context
+
+```
+// theme-context.js
+// Make sure the shape of the default value passed to createContext matches the shape that the consumer expects!
+export const ThemeContext = React.createContext({
+  theme: themes.dark,
+  toggleTheme: () => {},
+});
+```
+
+```
+// theme-toggle-button.js
+import { ThemeContext } from './theme-context';
+
+function ThemeTogglerButton() {
+  // The Theme Toggler Button receives not only the theme but also a toggleTheme function from the context
+  return (
+    <ThemeContext.Consumer>
+      {({theme, toggleTheme}) => (
+        <button
+          onClick={toggleTheme}
+          style={{ backgroundColor: theme.background }}
+        >
+          Toggle Theme
+        </button>
+      )}
+    </ThemeContext.Consumer>
+  );
+}
+
+export default ThemeTogglerButton;
+```
+
+```
+// app.js
+import { ThemeContext, themes } from './theme-context';
+import ThemeTogglerButton from './theme-toggler.button';
+
+class App extends React.Component {
+  constructor(props) {
+    super(props);
+
+    this.toggleTheme = () => {
+      this.setState(state => ({
+        theme:
+          state.theme === themes.dark
+            ? themes.light
+            : themes.dark,
+      }));l
+    };
+
+    // State also contains the updater function so it will be passed down into the context provider
+    this.state = {
+      theme: themes.light,
+      toggleTheme: this.toggleTheme,
+    };
+  }
+
+  render() {
+    // The entire state is passed to the provider
+    return (
+      <ThemeContext.Provider value={this.state}>
+        <Content />
+      </ThemeContext.Provider>
+    );
+  }
+}
+
+function Content() {
+  return (
+    <div>
+      <ThemeTogglerButton />
+    </div>
+  );
+}
+
+ReactDOM.render(<App />, document.root);
+```
+
+### Consuming multiple contexts
+
+- To keep context re-rendering fast, React needs to make each context consumer a separate node in the tree
+
+```
+// Theme context default to light theme
+const ThemeContext = React.createContext('light');
+
+// Signed-in user context
+const UserContext = Rect.createContext({
+  name: 'Guest',
+});
+
+class App extends React.Component {
+  render() {
+    const {signedInUser, theme} = this.props;
+
+    // App component provides initial context values
+    return (
+      <ThemeContext.Provider value={theme}>
+        <UserContext.Provider value={signedInUser}>
+          <Layout />
+        </UserContext.Provider>
+      </ThemeContext.Provider>
+    );
+  }
+}
+
+function Layout() {
+  return (
+    <div>
+      <Sidebar />
+      <Content />
+    </div>
+  );
+}
+
+// A component may consume multiple contexts
+function Content() {
+  return (
+    <ThemeContext.Consumer>
+      {theme => (
+        <UserContext.Consumer>
+          {user => (
+            <ProfilePage user={user} theme={theme} />
+          )}
+        </UserContext.Consumer>
+      )}
+    </ThemeContext.Consumer>
+  )
+}
+```
+
+- If 2 or more context values are often used together, one might want to consider creating their own render prop component that provides both
