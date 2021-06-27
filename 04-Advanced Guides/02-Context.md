@@ -465,3 +465,41 @@ function Content() {
 ```
 
 - If 2 or more context values are often used together, one might want to consider creating their own render prop component that provides both
+
+## Caveats
+
+- Context uses reference identity to determine when to re-render, there're some gotchas that could trigger unintentional renders in consumers when a provider's parent re-renders 
+- E.g. the code below will re-render all consumers every time the Provider re-renders because a new object is always created for `value
+
+```
+class App extends React.Component {
+  render() {
+    return (
+      <MyContext.Provider value=({ something: 'something}}>
+        <Toolbar />
+      </MyContext.Provider>
+    );
+  }
+}
+```
+
+- To get around this, life the value into parent's state
+
+```
+class App extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      value: { something: 'something' },
+    };
+  }
+
+  render() {
+    return (
+      <MyContext.Consumer value={this.state.value}>
+        <Toolbar />
+      </MyContext.Consumer>
+    )
+  }
+}
+```
