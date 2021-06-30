@@ -138,3 +138,45 @@ function logProps(Component) {
   });
 }
 ```
+
+## Displaying a custom name in DevTools
+
+- `React.forwardRef` accepts a render function. React DevTools uses this function to determine what to display for the ref forwarding component
+- E.g. the following component will appear as "ForwardRef" in the DevTools
+
+```
+const WrappedComponent = React.forwardRef((props, ref) => {
+  return <LogProps {...props} forwardRef={ref} />;
+});
+```
+
+- If one names the function, DevTools will also include its name (e.g. "ForwardRef(myFunction)")
+
+```
+const WrappedComponent = React.frowardRef(
+  function myFunction(props, ref) {
+    return <LogProps {...props} forwardRef={ref} />;
+  }
+);
+```
+
+- One can event set the function's `displayName` property to include the component one is wrapping
+
+```
+function logProps(Component) {
+  class LogProps extends React.Component {
+    // ...
+  }
+
+  function forwardRef(props, ref) {
+    return <LogProps {...props} forwardedRef={ref} />;
+  }
+
+  // Give this component a more helpful display name in DevTools.
+  // E.g. "ForwardRef(logProps(MyComponent))"
+  const name = Component.displayName || Component.name;
+  forwardRef.displayName = `logProps(${name})`;
+
+  return React.forwardRef(forwardRef);
+}
+```
