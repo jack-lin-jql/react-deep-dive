@@ -123,3 +123,146 @@ handleChange(e) {
   this.props.onChange(e.target.value);
 }
 ```
+
+- Finally, there's one more thing to do. In React, props can change over time
+- E.g., the `<Chosen>` component can get different children if parent component's state changes. This means that at integration points, it's important that we manually update the DOM in response to prop updates, since we no long let React manage the DOM for us
+- Chosen's documentation suggests that we can use jQuery `trigger()` API to notify it about changes to the original DOM element
+- We'll let React take care of updating `this.props.children` inside `<select>`, but we'll also add a `componentDidUpdate()` lifecycle method that notifies Chose about changes in the children list
+
+```
+componentDidUpdate(prevProps) {
+  if(prevProps.children !== this.props.children) {
+    this.$el.trigger("chosen:updated");
+  }
+}
+```
+
+- This way, Chosen will know to update its DOM element when the `<select>` children managed by React change
+
+```
+// Complete implementation
+class Chosen extends React.Component {
+  componentDidMount() {
+    this.$el = $(this.el);
+    this.$el.chosen();
+
+    this.handleChange = this.handleChange.bind(this);
+    this.$el.on('change', this.handleChange);
+  }
+
+  componentDidUpdate(prevProps) {
+    if(prevProps.children !== this.props.children) {
+      this.$el.trigger("chosen:updated");
+    }
+  }
+
+  componentWillUnmount() {
+    this.$el.off('change', this.handleChange);
+    this.$el.chosen('destroy');
+  }
+
+  handleChange(e) {
+    this.props.onChange(e.target.value);
+  }
+
+  render() {
+    return (
+      <div>
+        <select className="Chosen-select" ref={el => this.el = el}>
+          {this.props.children}
+        </select>
+      </div>
+    );
+  }
+}
+```
+
+## Integrating with other view libraries
+
+- React can be embedded into other applications thanks to the flexibility of ReactDOM.render()
+- Although React is commonly used at startup to load a single root React component into the DOM, `ReactDOM.render()` can also be called multiple times for independent parts of the UI which can be as small as a button or as large as an app
+- In fact, this is exactly how React is used at FB, it lets one write applications in React piece by piece, and combine them with their existing server-generated templates and other client-side code
+
+### Replacing string-based rendering with React
+
+- A common pattern in older web apps is to describe chunks of the DOM as a string and insert into the DOM like so `$el.html(htmlString)`
+- These points in a codebase are perfect for introducing React, simply rewrite the string based rendering as a React component
+
+```
+// This implementation in jQuery
+$('#container').html('<button id="btn">Say Hello</button>');
+$('#btn').click(function() {
+  alert('Hello!');
+});
+```
+
+```
+// Can be re-written like this in React
+function Button() {
+  return <button id="btn">Say Hello</button>;
+}
+
+ReactDOM.render(
+  <Button />,
+  document.getElementById('container'),
+  function() {
+    $('#btn').click(function() {
+      alert('Hello!');
+    });
+  }
+);
+```
+
+- From here one can start moving more logic into the component and begin adopting more common React practices
+- E.g., in component it's best not to rely on IDs because the same component can be rendered multiple times
+- Instead, on can use the React event system and register the click handler directly on the React `<button>` element
+
+```
+function Button(props) {
+  return <button onClick={props.onClick}>Say Hello</button>;
+}
+
+function HelloButton() {
+  function handleClick() {
+    alert('Hello!');
+  }
+
+  return <Button onClick={handleClick} />;
+}
+
+ReactDOM.render(
+  <HelloButton />,
+  document.getElementById('container');
+);
+```
+
+- One can have as many such isolated components as needed and use `ReactDOM.render()` to render them to different DOM containers 
+
+
+### Embedding React in a Backbone view
+
+- Backbone views typically use HTML strings, or string-producing template functions, to create the content for their DOM elements
+- This process, too, can be replaced with rendering a React component
+- Let's create a Backbone view called `ParagraphView` 
+  - It'll override Backbone's `render()` function to render a React `<Paragraph>` component into the DOM element provided by `this.el`
+
+```
+function Paragraph(props) {
+  return <p>{props.text}</p>;
+}
+
+const ParagraphView = Backbone.View.extends({
+  render() {
+    const text = this.model.get('text');
+    React.render(<Paragraph text={text} />, this.el);
+    return this;
+  },
+  remove() {
+    ReactDOM.unmountComponentAtNode(this.el);
+    Backbone.View.prototype.remove.call(this);
+  }
+});
+```
+
+- It's important that we also call `ReactDOM.unmountComponentAtNode()` in the `remove` method so that React unregisters event handlers and other resources associated with the component tree when it's detached
+- When a component is removed from within a React tree, the cleanup is performed automatically, but because we're removing the entire tree by hand, we must call this method
