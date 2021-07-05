@@ -266,3 +266,156 @@ const ParagraphView = Backbone.View.extends({
 
 - It's important that we also call `ReactDOM.unmountComponentAtNode()` in the `remove` method so that React unregisters event handlers and other resources associated with the component tree when it's detached
 - When a component is removed from within a React tree, the cleanup is performed automatically, but because we're removing the entire tree by hand, we must call this method
+
+## Integrating with model layers
+
+- While it's generally recommended to use unidirectional data flow such as React state, Flux, or Redux, React components can use a model layer from other frameworks and libraries
+
+### Using backbone models in React components
+
+- The simplest way to consume Backbone models and collections from a React component is to listen to the various change events and manually force an update
+- Components responsible for rendering models would listen to `'change'` events, while components responsible for rendering collections would listen for `'add'` and `'remove'` events
+- In both cases, call `this.forceUpdate()` to rerender the component with the new data
+- E.g. the `List` component renders a Backbone collection, using the `Item` component to render individual items
+
+```
+class Item extends React.Component {
+  constructor(props) {
+    super(props);
+    this.handleChange = this.handleChange.bind(this);
+  }
+
+  handleChange() {
+    this.forceUpdate();
+  }
+
+  componentDidMount() {
+    this.props.model.on('change', this.handleChange);
+  }
+
+  componentWillUnmount() {
+    this.props.model.off('change', this.handleChange);
+  }
+
+  render() {
+    return <li>{this.props.model.get('text')}</li>;
+  }
+}
+
+class List extends React.Component {
+  constructor(props) {
+    super(props);
+    this.handleChange = this.handleChange.bind(this);
+  }
+
+  handleChange() {
+    this.forceUpdate();
+  }
+
+  componentDidMount() {
+    this.props.collection.on('add', 'remove', this.handleChange);
+  }
+
+  componentWillUnmount() {
+    this.props.collection.off('add', 'remove', this.handleChange);
+  }
+
+  render() {
+    return (
+      <ul>
+        {this.props.collections.map(model => (
+          <Item key={model.cid} model={model} />
+        ))}
+      </ul>
+    );
+  }
+}
+```
+
+### Extracting data from Backbone models
+
+- The approach above requires React components to be aware of the Backbone models and collections 
+- If one later plan on to migrate to another data management solution, one might want to concentrate the knowledge about Backbone in as few parts of the code as possible
+- A solution to this is to extract the model's attributes as plain data whenever it changes, and keep this logic in a single place
+- The following is a HOC that extracts all attributes of a Backbone model into state, passing the data to the wrapped component
+- This way, only the HOC needs to know about Backbone model internals, and most components in the app can stay agnostic of Backbone
+- In the example, we'll make a copy of the model's attributes to form the initial state
+- We subscribe to the `change` event and unsubscribe on unmounting, and when it happens, we update the state with the model's current attributes
+- Finally, we make sure that if the `model` prop itself changes, we don't forget to unsubscribe from the old model, and subscribe to the new one
+- Note that isn't an exhaustive example with regards to working with Backbone
+
+```
+function connectToBackboneModel(WrappedComponent) {
+  return class BackboneComponent extends React.Component {
+    constructor(props) {
+      super(props);
+      this.state = Object.assign({}, props.model.attributes);
+      this.handleChange = this.handleChange.bind(this);
+    }
+
+    componentDidMount() {
+      this.props.model.on('change', this.handleChange);
+    }
+
+    componentWillReceiveProps(nextProps) {
+      this.setState(Object.assign({}, nextProps.model.attributes));
+      if (nextProps.model !== this.props.model) {
+        this.props.model.off('change', this.handleChange);
+        nextProps.model.on('change', this.handleChange);
+      }
+    }
+
+    componentWillUnmount() {
+      this.props.model.off('change', this.handleChange);
+    }
+
+    handleChange(model) {
+      this.setState(model.changeAttributes());
+    }
+
+    render() {
+      const props.ExceptModel = Object.assign({}, this.props);
+      delete props.ExceptModel.model;
+
+      return <WrappedComponent {...propsExceptModel} {...this.state}>;
+    }
+  }
+}
+```
+
+- Let's connect a `NameInput` React component to a Backbone model, and update its `firstName` attribute every time the input changes as a demo
+
+```
+function NameInput(props) {
+  return (
+    <p>
+      <input value={props.firstName}, onChange={props.handleChange} />
+      <br/>
+      My name is {props.firstName}.
+    </p>
+  );
+}
+
+const BackboneNameInput = connectToBackboneModel(NameInput);
+
+function Example(props) {
+  function handleChange(e) {
+    props.model.set('firstName', e.target.value);
+  }
+
+  return (
+    <BackboneNameInput
+      model={props.model}
+      handleChange={handleChange}
+    />
+  );
+}
+
+const model = new Backbone.Model({ firstName: 'Frodo' });
+ReactDOM.render(
+  <Example model={model} />,
+  document.getElementById('root')
+);
+```
+
+- This technique isn't limited to Backbone, one can use React with any model library by subscribing to its changes in the lifecycle methods and optionally, copying the data into the local React state
