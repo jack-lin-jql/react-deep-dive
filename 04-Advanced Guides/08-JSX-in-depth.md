@@ -152,3 +152,182 @@ function Story(props) {
   return <SpecificStory story={props.story} />;
 }
 ```
+
+## Props in JSX
+
+- There are several different ways to specify props in JSX
+ 
+
+### JS expression as props
+
+- One can pass any JS expression as a prop, but surrounding with `{}`
+
+`<MyComponent foo={1 + 2 + 3 + 4} />`
+
+- For `MyComponent` the value of `props.foo` will be 10 since the expression gets evaluated
+- `if` statements and `for` loops are not expressions in JS, so they can't be used in JSX directly
+- Instead, one needs to put these in the surrounding code
+
+```
+function NumberDescribe(props) {
+  let description;
+  if (props.number % 2 == 0) {
+    description = <strong>even</strong>;
+  } else {
+    description = <i>odd</i>;
+  }
+
+  return <div>{props.number} is an {description} number</div>;
+}
+```
+
+### String literals
+
+- One can pass a string literal as a prop
+
+```
+// Following is equivalent
+<MyComponent message="hello world" />
+
+<MyComponent message={'hello world'} />
+```
+
+- When one passes a string literal, its value is HTML-unescaped, so the following are equivalent
+
+```
+<MyComponent message="&lt;3" />
+
+<MyComponent message={'<3'} />
+```
+
+- This behavior is usually irrelevant
+
+### Props default to "true"
+
+- If one passes no value for a prop, it defaults to `true`
+
+```
+// Following are equivalent
+<MyTextBox autocomplete />
+
+<MyTextBox autocomplete={true} />
+```
+
+- In general, we **don't recommend not passing a value for a prop**, because it can be confused with the ES6 object shorthand `{foo}` which is short for `{foo: foo}` rather than `{foo: true}`
+- This behavior is there so that it matches the behavior of HTML
+
+### Spread attributes
+
+- If one already have `props` as an object and want to pass it in JSX, one can use `...` as a spread operator to pass the whole props object
+
+```
+// The following is equivalent
+function App1() {
+  return <Greeting firstName="Ben" lastName="Hector" />;
+}
+
+function App2() {
+  const props = {firstName: 'Ben', lastName: 'Hector'};
+  return <Greeting {...props} />;
+}
+```
+
+- One can also pick specific props that a component will consume while all other props using the spread operator
+
+```
+const Button = props => {
+  const { kind, ...other } = props;
+  const className = kind === "primary" ? "PrimaryButton" : "SecondaryButton";
+
+  return <button className={className} {...other} />;
+}
+
+const App = () => {
+  return (
+    <div>
+      <Button kind="primary", onClick={() => console.log("clicked!")}>
+        Hello World!
+      </Button>
+    </div>
+  );
+}
+```
+
+- In the example above, the `kind` prop is safely consumed and is not passed on to the `<button>` element in the DOM
+- All other props are passed via the `...other` object making this component really flexible
+- Spread attributes can be useful but they also make it easy to pass unnecessary props to components that don't care about them or pass invalid HTML attributes to the DOM. Use this syntax sparingly
+
+## Children in JSX
+
+- In JSX expressions that contain both an opening tag and a closing tag, the content between those tags is passed as a special prop: `props.children`
+- There are several different ways to pass children
+
+### String literals
+
+- One can put a string between the opening and closing tags and `props.children` will just be that string. Useful for many of the built-in HTML elements
+
+`<MyComponent>Hello world!</MyComponent>`
+
+- This is valid JSX and `props.children` in `MyComponent` will simply be the string `"Hello world!"`
+- HTML Is unescaped, so one can generally write JSX just like one would write HTML in this way
+
+`<div>This is a valid HTML &amp; JSX at the same time.</div>`
+
+- JSX removes whitespace at the beginning and the ending of a line
+- It also removes blank lines. New lines adjacent to tags are removed; new lines that occur in the middle of string literals are condensed into a single space
+
+```
+// The following all render to the same thing
+<div>Hello World</div>
+
+<div>
+  Hello World
+</div>
+
+<div>
+  Hello
+  World
+</div>
+
+<div>
+
+  Hello World
+</div>
+```
+
+### JSX children
+
+- One can provide more JSX elements as the children, which is useful for displaying nested components
+
+```
+<MyContainer>
+  <MyFirstComponent />
+  <MySecondComponent />
+</MyContainer>
+```
+
+- One can mix together different types of children, so one can use string literals together with JSX children
+- This is another way in which JSX is like HTML, so that this is both valid JSX and valid HTML:
+
+```
+<div>
+  Here is a list:
+  <ul>
+    <li>Item 1</li>
+    <li>Item 2</li>
+  </ul>
+</div>
+```
+
+- A React component can also return an array of elements
+
+```
+render() {
+  // No need to wrap list item in an extra element!
+  return [
+    <li key="A">First item</li>,
+    <li key="B">Second item</li>,
+    <li key="C">Third item</li>,
+  ]
+}
+```
