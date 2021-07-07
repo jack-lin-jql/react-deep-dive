@@ -331,3 +331,125 @@ render() {
   ]
 }
 ```
+
+### JS expressions as children
+
+- One can pass any JS expression as children by enclosing it with `{}`
+
+```
+// The following are equivalent
+<MyComponent>foo</MyComponent>
+
+<MyComponent>{'foo'}</MyComponent>
+```
+
+- This is often useful for rendering a list of JSX expressions of arbitrary length
+
+```
+function Item(props) {
+  return <li>{props.message}</li>;
+}
+
+function TodoList() {
+  const todos = ['finish doc', 'submit pr', 'nag dan to review'];
+  return (
+    <ul>
+      {todos.map((message) => <Item key={message} message={message} />)}
+    </ul>
+  );
+}
+```
+
+- JS expressions can be mixed with other types of children, this is often useful in lieu of string templates
+
+```
+function Hello(props) {
+  return <div>Hello {props.addressee}!</div>;
+}
+```
+
+### Function as children
+
+- Normally, JS expressions inserted in JSX will evaluate to a string, a React element, or a list of those things
+- However, `props.children` works just like any other props in that it can pass any sort of data, not just the sorts that React knows how to render
+- E.g. if one has a custom component, one could have it take a callback as `props.children`
+
+```
+// Calls the children callback numTimes to produce a repeated component
+function Repeat(props) {
+  let items = [];
+  for (let i = 0; i < props.numTimes; i++) {
+    items.push(props.children(i));
+  }
+
+  return <div>{items}</div>;
+}
+
+function ListOfTenThings() {
+  return (
+    <Repeat numTimes={10}>
+      {(index) => <div key={index}>This is item {index} in the list</div>}
+    </Repeat>
+  );
+}
+```
+
+- Children passed to a custom component can be anything as long as that component transforms them into something React can understand before rendering
+- This usage isn't common, but it works if one wants to stretch what JSX is capable of
+
+### Booleans, null, and undefined are ignored
+
+- `false`, `null`, `undefined`, and `true` are valid children, they simply don't render. The following will all render the same thing:
+
+```
+<div />
+
+<div></div>
+
+<div>{false}</div>
+
+<div>{null}</div>
+
+<div>{undefined}</div>
+
+<div>{true}</div>
+```
+
+- This can be useful to conditionally render React elements
+- This JSX renders the `<Header />` component only if `showHeader` is `true`
+
+```
+<div>
+  {showHeader && <Header />}
+  <Content />
+</div>
+```
+
+- A caveat is that some "falsy" values such as the `0` number are still rendered by React
+- E.g. this code will not behave as one might expect since `0` will be printed when `props.messages` is an empty array
+
+```
+<div>
+  {props.messages.length &&
+    <MessageList message={props.messages} />
+  }
+</div>
+```
+
+- To fix, makes sure the LHS expression always returns a boolean
+
+```
+<div>
+  {props.messages.length > 0 &&
+    <MessageList messages={props.messages} />
+  }
+</div>
+```
+
+- Conversely, if one wants a value like `false`, `null`, `undefined`, or `true` to appear in the output, simply convert to a string first
+
+```
+<div>
+  My JS variable is {String(myVariable)}.
+</div>
+```
