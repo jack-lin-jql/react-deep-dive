@@ -140,3 +140,99 @@ React.cloneElement(
 
 - However, it also preserves `ref`s. This means that if one gets a child with a `ref` on it, one won't accidentally steal it from your ancestor
 - One will get the same `ref` attached to their new element
+
+### createFactory()
+
+`React.createFactory(type)`
+
+- Returns a function that produces React elements of a given type
+- Like `React.createElement()`, the type argument can be either a tag name string such as 'div' or 'span", a React component type (a class or function) or a React fragment type
+- **This helper is considered legacy**, use JSX or use `React.createElement()` directly instead
+- One will not typically use `React.createFactory()` directly if using JSX
+
+### isValidElement()
+
+`React.isValidElement(object)`
+
+- Verifies the object is a React element, returns true or false
+
+### React.Children
+
+
+- `React.Children` provides utilities for dealing with the `this.props.children` opaque data structure
+
+#### React.Children.map
+
+`React.Children.map(children, function[(thisArg)])`
+
+- Invokes a function on every immediate child contained within `children` with `this` set to `thisArg`
+- If `children` is an array it will be traversed and the function will be called for each child in the array
+- If children is `null` or `undefined`, this method will return `null` or `undefined` rather than an array
+- Note: If `children` is a Fragment it will be treated as a single child and not traversed
+
+#### React.Children.forEach
+
+`React.Children.forEach(children, function[(thisArg)])`
+
+- Like `React.Children.map()` but doesn't return an array
+
+#### React.Children.count
+
+`React.Children.count(children)`
+
+- Returns the total number of components in `children`, equal to the number of times that a callback passed to `map` or `forEach` would be invoked
+
+#### React.Children.only
+
+`React.Children.only(children)`
+
+- Verifies that children has only one child (a React element) and returns it. otherwise this method throws an error
+- Note: `React.Children.only()` doesn't accept that return value of `React.Children.map()` because it's an array rather than a React element
+
+#### React.Children.toArray
+
+`React.Children.toArray(children)`
+
+- Returns the `children` opaque data structure as a flat array with keys assigned to each child
+- Useful if one wants to manipulate collections of children in their render methods, especially if one wants to reorder or slice `this.props.children` before passing it down
+- Note: `React.Children.toArray()` changes keys to preserve the semantics of nested arrays when flattening lists of children. That is, `toArray` prefixes each key in the returned array so that each element's key is scoped to the input array containing it
+
+### React.Fragment
+
+- The `React.Fragment` component lets one return multiple elements in a `render()` method without creating an additional DOM element
+
+```
+render() {
+  return (
+    <React.Fragment>
+      Some test.
+      <h2>A heading</h2>
+    </React.Fragment>
+  );
+}
+```
+
+- One can also use it with the shorthand `<></>` syntax
+
+### React.createRef
+
+- `React.createRef` creates a ref that can be attached to React elements via the ref attribute
+
+```
+class MyComponent extends React.Component {
+  constructor(props) {
+    super(props);
+
+    this.inputRef = React.createRef();
+  }
+
+  render() {
+    return <input type="text" ref={this.inputRef} />;
+  }
+
+  componentDidMount() {
+    this.inputRef.current.focus();
+  }
+}
+```
+
