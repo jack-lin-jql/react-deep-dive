@@ -177,3 +177,81 @@ componentDidUpdate(prevProps) {
 - The methods in this section correspond to uncommon use cases, they're handy once in a while, but most of components probably don't need any of them
 
 #### shouldComponentUpdate()
+
+`shouldComponentUpdate(nextProps, nextState)`
+
+- Use `shouldComponentUpdate()` to let React know if a component's output is not affected by the current change in state or props
+- The default behavior is to re-render on every state change and in the vast majority of cases one should rely on the default behavior
+- `shouldComponentUpdate()` is invoked before rendering when new props or state are being received
+- Defaults to `true`. This method isn't called for the initial render or when `forceUpdate()` is used
+- The method only exists as a performance optimization, do not rely on it to "prevent" a rendering, as this can lead to bugs
+- Consider using the built-in **PureComponent** instead of writing `shouldComponentUpdate()` by hand
+- `PureComponent` performs a shallow comparison of props and state, and reduces the chance that one will skip a necessary update
+- If one is confident to write by hand, one can compare `this.props` with `nextProps` and `this.state` with `nextState` and return `false` to tell React the update can be skipped
+- Note that returning `false` doesn't prevent child components from re-rendering when their state changes
+- It's not recommended to do a deep equality check or using `JSON.stringify()` in `shouldComponentUpdate()` since it's very inefficient and will harm performance
+- Currently, if `shouldComponentUpdate()` returns `false` then `UNSAFE_componentWillUpdate()`, `render()`, and `componentDidUpdate()` won't be invoked
+- In the future, React may treat `shouldComponentUpdate()` as a hint rather than a strict directive and returning false may still result in a re-rendering of the component
+
+#### static getDerivedStateFromProps()
+
+`static getDerivedStateFromProps(props, state)`
+
+- `getDerivedStateFromProps` is invoked right before calling the render method, both on the initial mount and on subsequent updates
+- It should return an object to update the state, or `null` to update nothing
+- This method exists for rare use cases where the state depends on changes in props over time
+- E.g. it might be handy for implementing a `<Transition>` component that compares its previous and next children to decide which of them to animate in and out
+- Deriving state leads to verbose code and makes components difficult to think about
+  - If one needs to perform a side effect (e.g. data fetching or an animation) in response to a change in props, use `componentDidUpdate` lifecycle instead
+  - If one wants to re-compute some data only when a prop changes, use a memoization helper instead
+  - If one wants to "reset" some state when a prop changes, consider either making a component fully controlled or fully uncontrolled with a key instead
+- This method doesn't have access to the component instance, if one would like, one can reuse some code between `getDerivedStateFromProps()` and the other class methods by extracting pure functions of the component props and state outside the class function
+- Note this method is fired on every render, regardless of the cause. This is in contrast to `UNSAFE_componentWillReceiveProps`, which only fires when the parent causes a re-render and not as a result of the local `setState`
+
+#### getSnapshotBeforeUpdate()
+
+`getSnapshotBeforeUpdate(prevProps, prevState)`
+
+- `getSnapshotBeforeUpdate()` is invoked right before the most recently rendered output is committed to e.g. the DOM
+- It enables a component to capture some information from the DOM (e.g. scroll position) before it's potentially changed
+- Any value returned by this lifecycle method will be passed as a parameter to `componentDidUpdate()`
+- This use case isn't common, but it may occur in UIs like chat thread that need to handle scroll position in a special way
+- A snapshot value (or null) should be returned
+
+```
+class ScrollingList extends React.Component {
+  constructor(props) {
+    super(props);
+    this.listRef = React.createRef();
+  }
+
+  getSnapshotBeforeUpdate(prevProps, prevState) {
+    // Are we adding new items to the list?
+    // Capture the scroll position so it can be adjusted later
+    if (prevProps.list.length < this.props.list.length) {
+      const list = this.listRef.current;
+      return list.scrollHeight - list.scrollTop;
+    }
+
+    return null;
+  }
+
+  componentDidUpdate(prevProps, prevState, snapshot) {
+    // If we have a snapshot value, we've just added new items.
+    // Adjust scroll so these new items don't push the old ones out of view.
+    // (snapshot here if the value returned from getSnapshotBeforeUpdate)
+    if (snapshot !== null) {
+      const list = this.listRef.current;
+      list.scrollTop = list.scrollHeight - snapshot;
+    }
+  }
+
+  render() {
+    return (
+      <div ref={this.listRef}>{/* ...contents... */}</div>
+    );
+  }
+}
+```
+
+- In the above example, it's important to read the `scrollHeight` property in `getSnapshotBeforeUpdate` because there may be delays between "render" phase lifecycles (like `render`) and "commit" phase lifecycles (like `getSnapshotBeforeUpdate` and `componentDidUpdate`)
