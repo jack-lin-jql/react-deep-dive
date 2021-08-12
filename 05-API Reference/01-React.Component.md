@@ -255,3 +255,92 @@ class ScrollingList extends React.Component {
 ```
 
 - In the above example, it's important to read the `scrollHeight` property in `getSnapshotBeforeUpdate` because there may be delays between "render" phase lifecycles (like `render`) and "commit" phase lifecycles (like `getSnapshotBeforeUpdate` and `componentDidUpdate`)
+
+#### Error boundaries
+
+- Error boundaries are React components that catch JS errors anywhere in their child component tree, log those errors, and display a fallback UI instead of the component tree that crashed
+- Error boundaries catch errors during rendering, in lifecycle methods, and in constructors of the whole tree below them
+- A class component becomes an error boundary if it defines either (or both) of the lifecycle methods `static getDerivedStateFromError()` or `componentDidCatch()`
+- Updating state from these lifecycles lets one capture an unhandled JS error in the below tree and display a fallback UI
+- Only use error boundaries for recovering from unexpected exceptions; don't try to use them for control flow
+- Note: Error boundaries only catch errors in the components **below** them in the tree. An error boundary can't catch an error within itself
+
+##### static getDerivedStateFromError()
+
+`static getDerivedStateFromError(error)`
+
+- This lifecycle is invoked after an error has been thrown by a descendant component
+- It receives the error that was thrown as a parameters and should return a value to update state
+
+```
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error) {
+    // Update state so the next render will show the fallback UI
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      // One can render any custom fallback UI
+      return <h1>Something went wrong.</h1>;
+    }
+
+    return this.props.children;
+  }
+}
+```
+
+- Note: `getDerivedStateFromError()` is called during the "render" phase, so side-effects aren't permitted. For those use cases, use `componentDidCatch()` instead
+
+#### componentDidCatch()
+
+`componentDidCatch(error, info)`
+
+- This lifecycle is invoked after an error has been thrown by a descendant component
+- It receives 2 params:
+  1. `error` - The error that was thrown
+  2. `info` - An object with a `componentStack` key containing information about which component threw the error
+- `componentDidCatch()` is called during the "commit" phase, so side-effects are permitted. It should be used for things like logging errors:
+
+```
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error) {
+    // Update state os the next render will show the fallback UI.
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, info) {
+    // Example "componentStack":
+    //    in ComponentThatThrows (created by App)
+    //    in ErrorBoundary (created by App)
+    //    in div (created by App)
+    //    in App
+    logComponentStackToMyService(info.componentStack);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      // One can render any custom fallback UI
+      return <h1>Something went wrong.</h1>;
+    }
+
+    return this.props.children;
+  }
+}
+```
+
+- Production and development builds of React slightly differ in the way `componentDidCatch()` handles errors
+- On development, the errors will bubble up to `window`, this means that any `window.onerror` or `window.addEventListener('error', callback)` will intercept the errors that have been caught by `componentDidCatch()`
+- On production, instead, the errors won't bubble up, which means any ancestor error handler will only receive errors not explicitly caught by `componentDidCatch()`
+- Note: In the event of an error, one can render a fallback UI with `componentDidCatch()` by calling `setState`, but this will be deprecated in a future release. Use `static getDerivedStateFromError()` to handle fallback rendering instead
+
