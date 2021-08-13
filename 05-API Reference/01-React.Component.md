@@ -344,3 +344,120 @@ class ErrorBoundary extends React.Component {
 - On production, instead, the errors won't bubble up, which means any ancestor error handler will only receive errors not explicitly caught by `componentDidCatch()`
 - Note: In the event of an error, one can render a fallback UI with `componentDidCatch()` by calling `setState`, but this will be deprecated in a future release. Use `static getDerivedStateFromError()` to handle fallback rendering instead
 
+### Legacy lifecycle methods
+
+- The lifecycle methods here still work, but are not recommended to use in code
+
+#### UNSAFE_componentWillMount()
+
+- NOTE: This was previously named `componentWillMount` and that name continues to work until version 17
+- `UNSAFE_componentWillMount()` is invoked just before mounting occurs
+- It's called before `render()`, therefore calling `setState()` synchronously in this method won't trigger an extra rendering
+- Generally, it's commended to use the `constructor()` for state initialization
+- Avoid introducing any side-effects or subscriptions in this method, use `componentDidMount()` instead
+- THis is the only lifecycle method called on server rendering
+
+#### UNSAFE_componentWillReceiveProps()
+
+`UNSAFE_componentWillReceiveProps(nextProps)`
+
+- NOTE: This lifecycle was previously named `componentWillReceiveProps` which will work until version 17
+- NOTE: This lifecycle methods often leads to bugs and inconsistencies
+  - If one needs to perform a side effect in response to changes in props, use `componentDidUpdate` lifecycle instead
+  - If one used `componentWillReceiveProps` to re-compute some data only when a prop changes, use memoization helper instead
+  - If one used `componentWillReceiveProps` to "reset" some state when a prop changes, consider either making a component full controlled or fully controlled with a key instead
+- `UNSAFE_componentWillReceiveProps()` is invoked before a mounted component receives new props
+- If one needs to update the state in response to prop changes, one may compare `this.props` and `nextProps` and perform state transitions using `this.setState()` in this method
+- Note that if a parent component causes a component to re-render, this method will be called even if props have not changed. Make sure to compare the current and next values if one only wants to handle changes
+- React doesn't call `UNSAFE_componentWillReceiveProps()` with initial props during mounting
+- It only calls this method if some of component's prop may update
+- Calling `this.setState()` generally doesn't trigger `UNSAFE_componentWillReceiveProps()`
+
+#### UNSAFE_componentWillUpdate()
+
+`UNSAFE_componentWillUpdate(nextProps, nextState)`
+
+- Note: This lifecycle was previously named `componentWillUpdate` which will work until version 17
+- `UNSAFE_componentWillUpdate()` is invoked just before rendering when new props or state are being received
+- Use this as an opportunity to perform preparation before an update occurs
+- This method is not called for the initial render
+- Note that one cannot call `this.setState()` here, nor should one do anything else (e.g. dispatch a Redux action) that would trigger an update to a React component before `UNSAFE_componentWillUpdate()` returns
+- Typically, this method can be replaced by `componentDidUpdate()`. If one was reading from the DOM in this method (e.g. to save a scroll position), one can move that logic to `getSnapshotBeforeUpdate()`
+- Note: `UNSAFE_componentWillUpdate()` won't be invoked if `shouldComponentUpdate()` returns false
+
+### Other APIs
+
+- Unlike the lifecycle methods above, the methods below are methods that one can call from their components
+
+#### setState()
+
+`setState(updater, [callback])`
+
+- `setState()` **enqueues** changes to the component state and tells React that this component and its children need to be re-rendered with the updated state
+- This is the primary method one uses to update the UI in response to event handlers and server responses
+- Think of `setState()` as **a request rather than an immediate command** to update the component
+- For better perceived performance, React may delay it, and then update several components in a single pass
+- React DOES NOT guarantee that the state changes are applied immediately
+- `setState()` doesn't always immediately update the component. It may batch or defer the update until later
+- This makes reading `this.state` right after calling `setState()` a potential pitfall
+- Instead, one should use `componentDidUpdate` or a `setState` callback, either of which are guaranteed to fire after the update has been applied
+- If one needs to set the state based on the previous state, refer to the updater argument
+- `setState()` will always lead to a re-render unless `shouldComponentUpdate()` returns `false` 
+- If mutable objects are being used and conditional rendering logic cannot be implemented in `shouldComponentUpdate()`, calling `setState()` only when the new state differs from the previous state will avoid unnecessary re-renders
+- The first argument is an `updater` function with the signature:
+
+`(state, props) => stateChange`
+
+- `state` is a reference to the component state at the time the change is being applied
+- It shouldn't be directly mutated, instead, changes should be represented by building a new object based on the input from `state` and `props`
+- For instance, suppose we wanted to increment a value in state by `props.step`:
+
+```
+this.setState((state, props) => {
+  return { counter: state.counter + props.step };
+});
+```
+
+- Both `state` and `props` received by the updater function are guaranteed to be up-to-date
+- The output of the updater is shallowly merged with `state`
+- The second param to `setState()` is an optional callback function that will be executed once `setState` is completed and the component is re-rendered
+  - Generally, it recommended to use `componentDidUpdate()` for such logic instead
+- One may optionally pass an object as the first argument to `setState()` instead of a function:
+
+`setState(stateChange[, callback])`
+
+- This performs a shallow merge of `stateChange` into the new state, e.g., to adjust a shopping cart item quantity:
+
+`this.setState({ quantity: 2 })`
+
+- This form of `setState()` is also asynchronous, and multiple calls during the same cycle may be batched together
+- E.g. if one attempts to increment an item quantity more than once in the same cycle, that will result in the equivalent of:
+
+```
+Object.assign(
+  previousState,
+  { quantity: state.quantity + 1 },
+  { quantity: state.quantity + 1 },
+  ...
+)
+```
+
+- Subsequent calls will override values from previous calls in the same cycle, so the quantity will only be incremented once
+- If the next state depends on the current state, it's recommended to use the updater function form instead:
+
+```
+this.setState((state) => {
+  return {quantity: state.quantity + 1};
+});
+```
+
+#### forceUpdate()
+
+`component.forceUpdate(callback)`
+
+- By default, when one component's state or prop changes, the component will re-render
+- If a `render()` method depends on some other data, one can tell React that the component needs re-rendering by calling `forceUpdate()`
+- Calling `forceUpdate()` will cause `render()` to be called on the component, skipping `shouldComponentUpdate()`
+- This will trigger the normal lifecycle methods for child components, including the `shouldComponentUpdate()` method of each child
+- React will still only update the DOM if the markup changes
+- Normally, one should try to avoid all uses of `forceUpdate()` and only read from `this.props` and `this.state` in `render()`
