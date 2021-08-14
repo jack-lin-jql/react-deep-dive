@@ -461,3 +461,56 @@ this.setState((state) => {
 - This will trigger the normal lifecycle methods for child components, including the `shouldComponentUpdate()` method of each child
 - React will still only update the DOM if the markup changes
 - Normally, one should try to avoid all uses of `forceUpdate()` and only read from `this.props` and `this.state` in `render()`
+
+### Class properties
+
+#### defaultProps
+
+- `defaultProps` can be defined as a property on the component class itself, to set the default props for the class
+- This is used for `undefined` props, but not for `null` props, e.g.
+
+```
+class CustomButton extends React.Component {
+  //...
+}
+
+CustomButton.defaultProps = {
+  color: 'blue'
+};
+```
+
+- If `props.color` isn't provided, it'll be set by default to `'blue'`:
+
+```
+render() {
+  return <CustomButton />; // prop.color will be set to blue
+}
+```
+
+- If `props.color` is set to `null`, it'll remain `null`:
+
+```
+render() {
+  return <CustomButton color={null} />; // props.color will remain null
+}
+```
+
+#### displayName
+
+- The `displayName` string is used in debugging messages
+- Usually, one doesn't need to set it explicitly because it's inferred from the name of the function or class that defines the component
+- One might want to set it explicitly if one wants to display a different name for debugging purposes or when one creates a HOC
+
+### Instance properties
+
+#### props
+
+- `this.props` contains the props that were defined by the caller of this component
+- In particular, `this.props.children` is a special prop, typically defined by the child tags in the JSX express rather than in the tag itself
+
+#### state
+
+- The state contains data specific to this component that maybe change over time
+- The state is user-defined, and it should be a plain JS object
+- If some value isn't used for rendering or data flow (e.g., a timer ID), one doesn't have to put it in the state. Such values can be defined as fields on the component instance
+- Never mutate `this.state` directly, as calling `setState()` afterwards may replace the mutation one has made. Treat `this.state` as if it were immutable
