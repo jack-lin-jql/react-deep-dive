@@ -104,3 +104,39 @@ function ComponentWithTransition() {
 
 - Not all style properties are converted to pixel strings though
 - Certain ones remain unitless (e.g. zoom, order, flex)
+
+### suppressContentEditableWarning
+
+- Normally, there's a warning when an element with children is also marked as `contentEditable, because it won't work
+- This attribute suppresses that warning
+- Don't use this unless one's building a library that manages contentEditable manually
+
+### suppressHydrationWarning
+
+- If one is using server-side React rendering, normally there is a warning when the server and the client render different content
+- However, in some rare cases, it's very hard or impossible to guarantee an exact match. E.g. timestamps are expected to differ on the server and on the client
+- If one sets `suppressHydrationWarning` to `true`, React won't warning one about mismatches in the attributes and the content of that element
+- It only works one level deep, and is intended to be used as an escape hatch
+- Don't overuse it
+
+### value
+
+- The `value` attribute is supported by `<input>`, `<select>`, and `<textarea>` components
+- One can use it to set the value of the component
+- This is useful for building controlled components
+- `defaultValue` is the uncontrolled equivalent, which sets the value of the component when it's first mounted
+
+## All supported HTML attributes
+
+- As of React 16, any standard or custom DOM attributes are fully supported
+- React has always provided a JS-centric API to the DOM
+- Since React components often take both custom and DOM-related props, React uses the camelCase convention just like the DOM APIs
+
+```
+<div tabIndex={-1} /> // Just like node.tabIndex DOM API
+<div className={"Button"} /> // Just like node.className DOM API
+<input readOnly={true} /> // Just like node.readOnly DOM API
+```
+
+- These props work similarly to the corresponding HTML attributes, with the exception of special cases documented above
+- One may use custom attributes as long as they're fully **lowercase**
