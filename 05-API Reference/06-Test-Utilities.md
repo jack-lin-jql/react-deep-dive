@@ -166,3 +166,129 @@ isCompositeComponentWithType(
 
 - Returns `true` if `instance` is a component whose type is of a React `componentClass`
 
+### findAllInRenderedTree()
+
+```
+findAllInRenderedTree(
+  tree,
+  test
+)
+```
+
+- Traverse all components in `tree` and accumulate all components where `test(component)` is `true`
+- This is not useful on its own, but it's used as a primitive for other test utils
+
+### scryRenderedDOMComponentsWithClass()
+
+```
+scryRenderedDOMComponentsWithClass(
+  tree,
+  className
+)
+```
+
+- Finds all DOM elements of components in the rendered tree that are DOM components with the class name matching `className`
+
+### findRenderedDOMComponentWithClass()
+
+```
+findRenderedDOMComponentWithClass(
+  tree,
+  className
+)
+```
+
+- Like scryRenderedDOMComponentsWithClass(), but expect there to be one result, and returns that one result, or throw exception if there is any other number of matches besides one
+
+### scryRenderedDOMComponentsWithTag()
+
+```
+scryRenderedDOMComponentsWithTag(
+  tree,
+  tagName
+)
+```
+
+- Finds all DOM elements of components in the rendered tree that are DOM components with the tag name matching `tagName`
+
+### findRenderedDOMComponentWithTag()
+
+```
+findRenderedDOMComponentWithTag(
+  tree,
+  tagName
+)
+```
+
+- Like scryRenderedDOMComponentsWithTag(), but expect there to be one result, and returns that one result, or throw exception if there is any other number of matches besides one
+
+### scryRenderedComponentsWithType()
+
+```
+scryRenderedComponentsWithType(
+  tree,
+  componentClass
+)
+```
+
+- Finds all instances of components with type equal to `componentClass`
+
+### findRenderedComponentWithType()
+
+```
+findRenderedComponentWithType(
+  tree,
+  componentClass
+)
+```
+
+- Like scryRenderedDOMComponentsWithType(), but expect there to be one result, and returns that one result, or throw exception if there is any other number of matches besides one
+
+### renderIntoDocument()
+
+`renderIntoDocument(element)`
+
+- Render a React element into a detached DOM node in the document
+- This function requires a DOM, it's effectively equivalent to:
+
+```
+const domContainer = document.createElement('div');
+
+ReactDOM.render(element, domContainer);
+```
+
+- Note: One will need to have `window`, `window.document` and `window.document.creteElement` globally available before one imports React. Otherwise, React will think it can't access the DOM and methods like `setState` won't work
+
+## Other utilities
+
+### Simulate
+
+```
+Simulate.{eventName}(
+  element,
+  [eventData]
+)
+```
+
+- Simulate an event dispatch on a DOM node with optional `eventData` event data
+- Simulate has a method for every event that React understands
+
+#### Click an element
+
+```
+// <button ref={(node) => this.button = node}>...</button>
+const node = this.button;
+ReactTestUtils.Simulate.click(node);
+```
+
+#### Changing the value of an input field and then pressing ENTER
+
+```
+// <input ref={(node) => this.textInput = node} />
+const node = this.textInput;
+node.value = "giraffe";
+ReactTestUtils.Simulate.change(node);
+ReactTestUtils.Simulate.keyDown(node, {key: "Enter", keyCode: 13, which: 13});
+```
+
+- Note: One will have to provide any event property that they're using in their component (e.g. keyCode, which, etc...) as React is not reacting any of these for them
