@@ -141,3 +141,28 @@ class Welcome extends React.Component {
   - However this also means that one can't force the field to have a certain value
 - Most cases, one should use controlled components
 
+## Keys
+
+- A "key" is a special string attribute one needs to include when creating arrays of elements
+- It helps React identify which items have changed, are added or are removed
+- Keys should be given to the elements inside an array to give the elements a stable identity
+- Keys only need to be unique among sibling elements in the same array. NO need to be unique across the whole application or even a single component
+- Don't pass something like `Math.random()` to keys since that's not a stable identity! When it re-renders, a new random number is generated
+- Ideally, keys should correspond to unique and stable identifiers coming from one's data, such as `post.id`
+
+## Refs
+
+- `ref` attribute can be an object created by `React.createRef()` or a callback function
+- When the `ref` attribute is a callback function, the function receives the underlying DOM element or class instance (depending on the type of element) as its argument, allowing one to get direct access to the DOM element or component instance
+
+
+## Events
+
+- React event handling has some syntactic differences:
+  - React event handlers are named using camelCase instead of lowercase
+  - With JSX, one passes a function as the event handler rather than a string
+
+## Reconciliation
+
+- When a component's prop or state change, React decides whether the actual DOM update is necessary by comparing the newly returned element with the previously rendered one
+- When they aren't equal, React will update the DOM
