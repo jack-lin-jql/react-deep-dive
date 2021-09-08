@@ -128,3 +128,157 @@ function Example() {
 - This makes apps feel more responsive and majority of the effects don't need to happen synchronously
 - In uncommon cases where they do (such as measuring the layout), use `useLayoutEffect` hook instead
 
+## Effects with cleanup
+
+- Some effects requires cleanup if they, for example, deal with subscription to some external data source. It is important to clean up to ensure no memory leak
+
+### Example using classes
+
+```js
+class FriendStatus extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { isOnline: null };
+    this.handleStatusChange = this.handleStatusChange.bind(this);
+  }
+
+  componentDidMount() {
+    ChatAPI.subscribeToFriendStatus(
+      this.props.friend.id,
+      this.handleStatusChange
+    );
+  }
+
+  componentWillUnmount() {
+    ChatAPI.unsubscribeFromFriendStatus(
+      this.props.friend.id,
+      this.handleStatusChange
+    );
+  }
+
+  handleStatusChange(status) {
+    this.setState({
+      isOnline: status.isOnline
+    });
+  }
+
+  render() {
+    if (this.state.isOnline === null) {
+      return 'Loading...';
+    }
+
+    return this.state.isOnline ? 'Online' : 'Offline';
+  }
+}
+```
+
+- Note how `componentDidMount` and `componentWillUnmount` mirrors each other
+- Lifecycle methods forces the split of this logic even though conceptually code in both of them is related to the same effect
+
+### Example using hooks
+
+- If an effect returns a function, React will run it when it is time to clean up
+
+```js
+import React, { useState, useEffect } from 'react';
+
+function FriendStatus(props) {
+  const [isOnline, setIsOnline] = useState(null);
+
+  useEffect(() => {
+    function handleStatusChange(status) {
+      setIsOnline(status.isOnline);
+    }
+
+    ChatAPI.subscribeToFriendStatus(props.friend.id, handleStatusChange);
+
+    // Specify how to clean up after this effect:
+    return function cleanup() {
+      ChatAPI.unsubscribeFromFriendStatus(props.friend.id, handleStatusChange);
+    };
+  });
+
+  if (isOnline === null) {
+    return 'Loading...';
+  }
+
+  return isOnline ? 'Online' : 'Offline';
+}
+```
+
+- Why did we return a function from our effect? - It is an optional cleanup mechanism for effects
+  - Every effect may return a function that cleans up after it
+  - Allows the logic for adding and removing subscription close to each other as they're part of the same effect
+- When exactly does React clean up an effect? - React performs the cleanup when the component unmounts
+  - However! Effects run for every render and not just once
+  - This is why React also cleans up effects from the previous render before running the effects next time
+
+## Tip: Use multiple effects to separate concerns
+
+- A problem with class lifecycle methods is that they often contain unrelated logic, but related logic gets broken up into several methods
+
+```js
+class FriendStatusWithCount extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { count: 0, isOnline: null};
+    this.handleStatusChange = this.handleStatusChange.bind(this);
+  }
+
+  componentDidMount() {
+    document.title = `You clicked ${this.state.count} times`;
+    ChatAPI.subscribeToFriendStatus(
+      this.props.friend.id,
+      this.handleStatusChange
+    );
+  }
+
+  componentDidUpdate() {
+    document.title = `You clicked ${this.state.count} times`;
+  }
+
+  componentWillUnmount() {
+    ChatAPI.unsubscribeFromFriendStatus(
+      this.props.friend.id,
+      this.handleStatusChange
+    );
+  }
+
+  handleStatusChange(status) {
+    this.setState({
+      isOnline: status.isOnline
+    });
+  }
+  // ...
+}
+```
+
+- Note the logic that sets `document.title` is split between `componentDidMount` and `componentDidUpdate`
+  - The subscription logic is also split between `componentDidMount` and `componentWillUnmount`
+  - `componentDidMount` contains code for both tasks
+- We can improve this by using multiple effects in a function component
+
+```js
+function FriendStatusWithCounter(props) {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    document.title = `You clicked ${count} times`;
+  });
+
+  const [isOnline, setIsOnline] = useState(null);
+  useEffect(() => {
+    function handleStatusChange(status) {
+      setIsOnline(status.isOnline);
+    }
+
+    ChatAPI.subscribeToFriendStatus(props.friend.id, handleStatusChange);
+    return () => {
+      ChatAPI.unsubscribeFromFriendStatus(props.friend.id, handleStatusChange);
+    };
+  });
+  // ...
+}
+```
+
+- Hooks lets us split the code based on what it is doing rather than a lifecycle method name
+- React will apply every effect used by the component, in the order they were specified
