@@ -282,3 +282,112 @@ function FriendStatusWithCounter(props) {
 
 - Hooks lets us split the code based on what it is doing rather than a lifecycle method name
 - React will apply every effect used by the component, in the order they were specified
+
+## Explanation: why effects run on each update
+
+- One might be wondering why the effect cleanup phase happens after every re-render, and not just once during unmounting
+
+```js
+componentDidMount() {
+  ChatAPI.subscribeToFriendStatus(
+    this.props.friend.id,
+    this.handleStatusChange
+  );
+}
+
+componentWillUnmount() {
+  ChatAPI.unsubscribeFromFriendStatus(
+    this.props.friend.id,
+    this.handleStatusChange
+  );
+}
+```
+
+- What happens here if the friend prop changes while the component is on the screen?
+  - The component would continue displaying the online status of a different friend
+  - This is a bug and causes a memory leak or crash when unmounting since the unsubscribe would use the wrong friend ID
+  - In a class component, one would need to add `componentDidUpdate` to handle this specific case
+  - Forgetting to handle `componentDidUpdate` is a common source of bugs in React
+
+```js
+function FriendStatus(props) {
+  // ...
+  useEffect(() => {
+    // ...
+    ChatAPI.subscribeToFriendStatus(props.friend.id, handleStatusChange);
+
+    return () => {
+      ChatAPI.unsubscribeFromFriendStatus(props.friend.id, handleStatusChange);
+    };
+  });
+}
+```
+
+- In the hooks case, it doesn't suffer from the previous bug
+- There's no special code for handling updates because `useEffect` handles them by default
+  - It cleans up the previous effects before applying the next effects
+
+```js
+// For example
+
+// Mount with { friend: { id: 100 } } props
+ChatAPI.subscribeToFriendStatus(100, handleStatusChange);     // Run first effect
+
+// Update with { friend: { id: 200 } } props
+ChatAPI.unsubscribeFromFriendStatus(100, handleStatusChange); // Clean up previous effect
+ChatAPI.subscribeToFriendStatus(200, handleStatusChange);     // Run next effect
+
+// Update with { friend: { id: 300 } } props
+ChatAPI.unsubscribeFromFriendStatus(200, handleStatusChange); // Clean up previous effect
+ChatAPI.subscribeToFriendStatus(300, handleStatusChange);     // Run next effect
+
+// Unmount
+ChatAPI.unsubscribeFromFriendStatus(300, handleStatusChange); // Clean up last effect
+```
+
+## Tip: optimizing performance by skipping effects
+
+- In some cases, cleaning up or applying an effect on every render might create a performance problem
+- In class components, this can be solved by writing an extra comparison with `prevProp` or `prevState` inside `componentDidUpdate`
+
+```js
+componentDidUpdate(prevProps, prevState) {
+  if (prevState.count !== this.state.count) {
+    document.title = `You clicked ${this.state.count} times`;
+  }
+}
+```
+
+- One can tell React to skip applying an effect if certain values haven't changed between renders in `useEffect`
+- This is done through an optional second argument which is of type array
+
+```js
+useEffect(() => {
+  document.title = `You clicked ${count} times`;
+}, [count]); // only re-run the effect if count changes
+```
+
+- Here, if `count` is `5` and then the component re-renders with `count` still equal to `5`, React will compare `[5]` from the previous render and `[5]` from the next render
+- Since all items in the array are the same (5 === 5), React would skip the effect
+- When updated to `6`, the comparison will result in a difference and React will re-apply the effect
+- When multiple items are in the array, React will re-run the effect even if just one of them is different
+This works for effects with a cleanup phase as well
+
+```js
+useEffect(() => {
+  function handleStatusChange(status) {
+    setIsOnline(status.isOnline);
+  }
+
+  ChatAPI.subscribeToFriendStatus(props.friend.id, handleStatusChange);
+  return () => {
+    ChatAPI.unsubscribeFromFriendStatus(props.friend.id, handleStatusChange);
+  };
+}, [props.friend.id]); // Only re-subscribe if props.friend.id changes
+```
+
+- Note: make sure the array includes all values from the component scope (such as props and state) that change over time and that are used by the effect. Otherwise, stale values from previous renders get references
+- If only running an effect and cleaning up only once (on mount and unmount), one can pass an empty array as a second argument
+  - This tells React that the effect doesn't depend on any values from props or state so it never needs to re-run. This follows directly from how the dependencies array always works
+- If passing an empty array while using props and state inside the effect, the props and state values will always have their initial values
+  - If the goal is to mimic `componentDidMount` and `componentWillUnmount`, there're usually better solutions
