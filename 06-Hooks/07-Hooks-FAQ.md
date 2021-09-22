@@ -385,3 +385,186 @@ function useClientRect() {
 }
 ```
 
+## Performance optimization
+
+### Is it safe to omit function from the list of dependencies?
+
+- Generally, no
+
+```js
+function Example({ someProp }) {
+  function doSomething() {
+    console.log(someProp);
+  }
+
+  useEffect(() => {
+    doSomething();
+  }, []); // This isn't safe since the function depends on `someProp`
+}
+```
+
+- It's sometimes difficult to remember props and states that are used by functions outside of the effect which is why one will usually want to declare functions needed by an effect inside of it. Making it easy to see what values from the component scope the effect depends on
+
+```js
+function Example({ someProp }) {
+  useEffect(() => {
+    function doSomething() {
+      console.log(someProp);
+    }
+
+    doSomething();
+  }, [someProp]);
+}
+```
+
+- If no values are used from the component scope, it's safe to specify `[]`
+
+```js
+useEffect(() => {
+  function doSomething() {
+    console.log('Hello');
+  }
+
+  doSomething();
+}, []);
+```
+
+- When specifying a list of dependencies, it must include all values used inside the callback and participate in the React data flow, including props, state, and anything derived from them
+- It's only safe to omit a function from the dependency list if nothing in it references props, state, or values derived from them
+
+```js
+// This example has a bug
+function ProductPage({ productId }) {
+  const [product, setProduct] = useState(null);
+
+  async function fetchProduct() {
+    const response = await fetch('..' + productId);
+    const json = await response.json();
+    setProduct(json);
+  }
+
+  useEffect(() => {
+    fetchProduct();
+  }, []); // Invalid since `fetchProduct` uses `productId`
+}
+```
+
+- Recommended fix above is to move the function inside of the effect, making it easy to see which props and state the effect uses
+
+```js
+function ProductPage({ productId }) {
+  const [product, setProduct] = useState(null);
+
+  useEffect(() => {
+    async function fetchProduct() {
+      const response = await fetch('..' + productId);
+      const json = await response.json();
+      setProduct(json);
+    }
+
+    fetchProduct();
+  }, [productId]);
+}
+```
+
+- This also allows one to handle out-of-order responses with a local variable inside the effect
+
+```js
+useEffect(() => {
+  let ignore = false;
+  async function fetchProduct() {
+    const response = await fetch('...' + productId);
+    const json = await response.json();
+    if (!ignore) setProduct(json);
+  }
+
+  fetchProduct();
+  return () => { ignore = true };
+}, [productId]);
+```
+
+- If one cannot move a function inside an effect, there're a few more options:
+  - One can try moving the function outside of the component: In this case, the function is guaranteed to not reference any props or state, so it doesn't need to be in the list of dependencies
+  - If the function is pure computation and safe to call while rendering, one may call it outside the effect instead and make the effect depend on the returned value
+  - Last resort: Add a function to effect dependencies but wrap its definition into the useCallback hook. This ensures it doesn't change on every render unless its own dependencies also change
+
+```js
+function ProductPage({ productId }) {
+  const fetchProduct = useCallback(() => {
+    // ...
+  }, [productId]);
+
+  return <ProductDetails fetchProduct={fetchProduct} />;
+}
+
+function ProductDetail({ fetchProduct }) {
+  useEffect(() => {
+    fetchProduct();
+  }, [fetchProduct]);
+}
+```
+
+- Note above the need to keep the function in the dependency list since that ensures the change in productId triggers a refetch in the ProductDetails component
+
+### What if the effect dependencies change too often?
+
+- Omitting state from list of dependencies usually leads to bugs
+
+```js
+function Counter() {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setCount(count + 1);
+    }, 1000);
+
+    return () => clearInterval(id);
+  }, []);
+
+  return <h1>{count}</h1>;
+}
+```
+
+- The problem here is that the `count` value goes stale due to the closure created on the value of `count` when it's `0`, so every second, the callback calls `setCount(0 + 1)`
+- Specifying `[count]` would fix the bug but it would cause the interval to be reset on every re-render, so each `setInterval` would get one chance to execute before being cleared
+- Fix this with the functional update form of setState
+
+```js
+function Counter() {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setCount(prevCount => prevCount + 1);
+    }, 1000);
+
+    return () => clearInterval(id);
+  }, []);
+
+  return <h1>{count}</h1>;
+}
+```
+
+- The identity of `setCount` function is guaranteed to be stable so it's safe to omit
+- Now, `setInterval` callback executes once a second and each time the inner call to `setCount` would have an up to date `count` value
+- When more complex, one can also move the state update logic outside the effect with using useReducer. The identity of the dispatch function from useReducer is always stable even if the reducer function is declared inside the component and reads its props
+- As last resort, one can have something like `this` in a class by using a ref to hold a mutable variable
+
+```js
+function Example(props) {
+  const latestProps = useRef(props);
+  useEffect(() => {
+    latestProps.current = props;
+  });
+
+  useEffect(() => {
+    function tick() {
+      console.log(latestProps.current);
+    }
+
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+}
+```
