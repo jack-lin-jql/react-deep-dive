@@ -568,3 +568,105 @@ function Example(props) {
   }, []);
 }
 ```
+
+### How to implement shouldComponentUpdate?
+
+- One can wrap a function component with React.memo to shallowly compare its props
+
+```js
+const Button = React.memo((props) => {
+  // Component
+});
+```
+
+- This isn't a hook since it doesn't compose like hooks do
+- `React.memo` is equivalent to `PureComponent`, but it only compares props
+  - One can also add a second argument to specify a custom comparison function that takes the old and new props. Returning true skips the update
+- `React.memo` doesn't compare states since there is no single state object to compare, but one can make children pure by optimizing with useMemo
+
+### How to memoize calculations?
+
+- The `useMemo` hook lets one cache calculations between multiple renders by "remembering" the previous computation 
+
+```js
+const memoizedValue = useMemo(() => computeExpensiveValue(a, b), [a, b]);
+```
+
+- Here, `computeExpensiveValue` is called and if the dependencies `[a, b]` haven't changed since the last value, `useMemo` skips calling it a second time and simply reuses the last value returned
+- The function passes to `useMemo` runs during rendering, so don't do anything there one wouldn't normally do while rendering
+- One may rely on useMemo as performance optimization, not as a semantic guarantee!
+  - React may choose to forget some previous memoized values and recalculate on next render to free memory from offscreen components
+  - Write code without `useMemo` and then add it to optimize performance
+- `useMemo` also lets one skip an expensive re-render of a child
+
+```js
+function Parent({ a, b }) {
+  // Only re-render if `a` changes
+  const child1 = useMemo(() => <Child1 a={a} />, [a]);
+  // Only re-render if `b` changes
+  const child2 = useMemo(() => <Child2 b={b} />, [b]);
+
+  return (
+    <>
+      {child1}
+      {child2}
+    </>
+  );
+}
+```
+
+- This structure won't work in a loop since Hooks can't be used there, but one can extract a separate component for the list item
+
+### How to create expensive objects lazily?
+
+-`useMemo` lets one memoize expensive calculation if the the dependencies are the same
+- But that only serves as a hint, not a guarantee that the computation won't re-run
+- Sometimes, one needs to be sure an object is only created once
+- The first common use case is when creating the initial state is expensive:
+
+```js
+function Table(props) {
+  // createRows() is called on every render
+  const [rows, setRows] = useState(createRows(props.count));
+  // ...
+}
+```
+
+- To avoid re-creating the ignored initial state, one can pass a function to useState:
+
+```js
+function Table(props) {
+  // createRow is only called once
+  const [row, setRow] = useState(() => createRow(props.count));
+  // ...
+}
+```
+
+- React will only call this function during the first render
+- One might occasionally want to avoid re-creating the useRef() initial value. E.g. ensure some imperative class instance only get created once
+
+```js
+function Image(props) {
+  // IntersectionObserver is created on every render
+  const ref = useRef(new IntersectionObserver(onIntersect));
+  // ...
+}
+```
+
+- `useRef` doesn't accept a special function overload like `useState`, instead one can write their own function that creates and sets lazily
+
+```js
+function Image(props) {
+  const ref = useRef(null);
+
+  function getObserver() {
+    if(ref.current === null) {
+      ref.current = new IntersectionObserver(onIntersect);
+    }
+    return ref.current;
+  }
+
+  // When needed it, call `getObserver()`
+  // ...
+}
+```
