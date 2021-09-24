@@ -670,3 +670,132 @@ function Image(props) {
   // ...
 }
 ```
+
+### Are hooks slow due to the creation of functions in render?
+
+- No. In modern browser, the raw performance of closures compared to classes doesn't differ significantly except in extreme scenarios
+- Consider the design of hook is more efficient in a couple ways
+  - Hooks avoid lots of overhead that classes require, like the cost of creating class instance and binding event handlers in the constructor
+  - Idiomatic code using hooks doesn't need the deep component tree nesting that's prevalent in codebases that use HOCs, render props, and context. With smaller component tree, React has less work to do
+- Traditionally, performance concerns around inline functions in React have been related to how passing new callbacks on each render breaks `shouldComponentUpdate` optimization in child components. Hooks approach this problem from 3 sides
+  - The `useCallback` hook lets one keep the same callback reference between re-renders so that `shouldComponentUpdate` continues to work
+  - The `useMemo` hook makes it easier to control when individual children update, reducing the need for pure components
+  - `useReducer` hook reduces the need to pass callbacks deeply
+
+### How to avoid passing callbacks down?
+
+- Many do not enjoy manually passing callbacks through every level of a component tree, even though it's more explicit, it can feel like a lot of plumbing
+- For larger components tree, one alternative is to pass down a dispatch function from `useReducer` via context
+
+```js
+const TodosDispatch = React.createContext(null);
+
+function TodosApp() {
+  // Note dispatch won't change between re-renders
+  const [todos, dispatch] = useReducer(todosReducer);
+
+  return (
+    <TodosDispatch.Provider value={dispatch}>
+      <DeepTree todos={todos} />
+    </TodosDispatch.Provider>
+  );
+}
+```
+
+- Any child in the tree can use `dispatch` function to pass actions up to `TodosApp`
+
+```js
+function DeepChild(props) {
+  // If to perform an action, single get dispatch from context
+  const dispatch = useContext(TodosDispatch);
+
+  function handleClick() {
+    dispatch({ type: 'add', text: 'hello' });
+  }
+
+  return (
+    <button onClick={handleClick}>Add todo</button>
+  );
+}
+```
+
+- This is both more convenient from the maintenance perspective (no need to keep forwarding callbacks) and avoids the callback problem altogether
+- Passing `dispatch` down like this is recommended pattern for deep updates
+- One can still choose to pass the application state down as props (more explicit) or as context (more convenient for very deep updates)
+- If one uses context to pass down the state too, use two different context types - the `dispatch` context never changes, so components that read it don't need to rerender unless they also need the application state
+
+### How to read an often-changing value from useCallback?
+
+- Note: `dispatch` is recommended to be passed down by context rather than individual callback in props
+- The following pattern may cause problems in concurrent mode, the safest solution right now is to invalidate the callback if some value it depends on changes
+- If one need to memoize a callback with `useCallback` but it doesn't work very well due to the inner function being re-created too often
+- If the function one is memoizing is an event handler and isn't used during rendering, one can use ref as an instance variable and save the last committed value into it manually
+
+```js
+function Form() {
+  const [text, updateText] = useState('');
+  const textRef = useRef();
+
+  useEffect(() => {
+    textRef.current = text; // Write it to the ref
+  });
+
+  const handleSubmit = useCallback(() => {
+    const currentText = textRef.current; // Read it from the ref
+    alert(currentText);
+  }, [textRef]); // Don't recreate handleSubmit like [text] would do
+
+  return (
+    <>
+      <input value={text} onChange={e => updateText(e.target.value)} />
+      <ExpensiveTree onSubmit={handleSubmit} />
+    </>
+  );
+}
+```
+
+- One can also extract into a custom hook
+
+```js
+function Form() {
+  const [text, updateText] = useState('');
+  // Will be memoized even if `text` changes
+  const handleSubmit = useEventCallback(() => {
+    alert(text);
+  }, [text]);
+
+  return (
+    <>
+      <input value={text} onChange={e => updateText(e.target.value)} />
+      <ExpensiveTree onSubmit={handleSubmit} />
+    </>
+  );
+}
+
+function useEventCallback(fn, dependencies) {
+  const ref = useRef(() => {
+    throw new Error('Cannot call an event handler while rendering.');
+  })
+
+  useEffect(() => {
+    ref.current = fn;
+  }, [fn, ...dependencies]);
+
+  return useCallback(() => {
+    const fn = ref.current;
+    return fn();
+  }, [ref]);
+}
+```
+
+- This isn't a recommended pattern!
+
+## Under the hood
+
+### How does React associate hook calls with components?
+
+- React keeps track of the currently rendering component
+- By the rules of hooks, it guarantees that hooks are only called from React components (or custom hooks) - which are also only called from React components)
+- There is an internal list of "memory cells" associated with each component, which are just JS objects where one can put some data
+- When a hook like useState gets called, it reads the current cell (or initializes it during the first render) and then moves the pointer to the next one
+- That is how multiple `useState()` calls each get independent local state
